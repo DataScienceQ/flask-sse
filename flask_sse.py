@@ -1,5 +1,6 @@
 # coding=utf-8
 from __future__ import unicode_literals
+from json.decoder import JSONDecodeError
 
 from collections import OrderedDict
 from flask import Blueprint, request, current_app, json, stream_with_context
@@ -58,7 +59,7 @@ class Message(object):
         if self.type:
             lines.insert(0, "event:{value}".format(value=self.type))
         if self.id:
-            lines.append("id:{value}".format(value=self.id))
+            lines.insert(0, "id:{value}".format(value=self.id))
         if self.retry:
             lines.append("retry:{value}".format(value=self.retry))
         return "\n".join(lines) + "\n\n"
@@ -137,8 +138,11 @@ class ServerSentEventsBlueprint(Blueprint):
         pubsub.subscribe(channel)
         for pubsub_message in pubsub.listen():
             if pubsub_message['type'] == 'message':
-                msg_dict = json.loads(pubsub_message['data'])
-                yield Message(**msg_dict)
+                try:
+                    msg_dict = json.loads(pubsub_message['data'])
+                    yield Message(**msg_dict)
+                except JSONDecodeError:
+                    pass
 
     def stream(self):
         """
